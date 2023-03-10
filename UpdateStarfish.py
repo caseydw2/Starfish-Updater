@@ -23,8 +23,9 @@ from GUI.GUI_Utilities import get_file, yes_no
 
 starfish_tracker_edits = "./Starfish Tracking Spring 2023.xlsx"
 
-
 #COMPARE STARFISH SPREASHEET WITH STARFISH TRACKING SPREADSHEET
+
+flags_to_track = ["Missing Assignments","Academic Concern", "Course Withdrawal", "Academics - Attend Tutoring-Closable","In Danger of Earning Under a C","I Need Help", "I Need Help In A Course"]
 
 def prep_starfish_sheet(sheet:str) -> pd.DataFrame:
     """Makes dataframe with 'First Name' and 'Last Name' column added from starfish's 'trackingitems {subj}'
@@ -44,6 +45,7 @@ def prep_starfish_sheet(sheet:str) -> pd.DataFrame:
     df[["Last Name","First Name"]] = df["names"].tolist()
 
     df["raiseDate"] = pd.to_datetime(df["raiseDate"])
+    df = df.loc[df["name"].isin(flags_to_track)] # Changed 3/6/2023. Hopefully to drop any flag/to-do we don't need
     df= df[["First Name", "Last Name", "studentExtId","name","category","courseId","raiseDate"]].astype({"studentExtId" : "str"})
     return df
 
@@ -80,8 +82,8 @@ def getCourse(course:str):
 def AddStudentToTopRow(student:pd.DataFrame,s) -> None:
     s.insert_rows(4)
     if type(student["First Name"]) != float:
-        s["A4"] = student["First Name"] + " " + student["Last Name"]
-    s["B4"] = student["studentExtId"]
+        s["A4"] = (student["First Name"] + " " + student["Last Name"]).strip()
+    s["B4"] = student["studentExtId"].strip()
     s["D4"] = getCourse(student["courseId"])[0]
     s["C4"] = getCourse(student["courseId"])[1]
     s["E4"] = student["name"].strip()
@@ -89,21 +91,21 @@ def AddStudentToTopRow(student:pd.DataFrame,s) -> None:
     s["G4"] = "N"
     s["I4"] = "N"
     s["J4"] = "N"
-    if student["category"] == "FLAG":
+    if student["category"] == "FLAG" or student['category'] == 'TO_DO':
         s["H4"]= "Y"
     else:
         s["H4"]= "N"
 
 def get_withdrawls(df:pd.DataFrame):
     df_w = df.loc[df["name"] == "Course Withdrawal"]
-    df_nw  = df.loc[df["name"] != "Course Withdrawal"].drop_duplicates(("studentExtId","category","name"))
+    df_nw  = df.loc[df["name"] != "Course Withdrawal"].drop_duplicates(("studentExtId","category"))
     return df_w,df_nw
 
 def update_student_row(row:int,since_date:dt.datetime,student:pd.DataFrame,s):
     recent_raise_date = student["raiseDate"]
     is_after_update = (since_date == None) or (recent_raise_date > since_date)
     is_same_flag = s["F" + str(row)].value == recent_raise_date
-    is_flag_of_concern = ((str(student["category"]) in ["FLAG" , "TO-DO"]) and (student["name"] not in ["Attendance Concern","Lack of Class Participation","Electronic Distraction"]))
+    is_flag_of_concern = ((str(student["category"]) in ["FLAG" , "TO_DO"]) and (student["name"] not in ["Attendance Concern","Lack of Class Participation","Electronic Distraction"]))
     if is_after_update and is_flag_of_concern and not is_same_flag:
         s["E" + str(row)] = student["name"] #Add the new flag name in flag column
         s["H" + str(row)] = "Y"
@@ -117,6 +119,7 @@ def addupdate_students(tracker0,subj:str) -> None:
         base_row = 4
         starfish = prep_starfish_sheet(get_file(f"{subj} data sheet pulled from starfish"))
         tracker = prep_tracking_sheet(tracker0,subj)
+        ids_stripped = [s.strip() for s in tracker["ID#"].values]
 
         sheet = subjdict[subj]["ssheet"]
         book = load_workbook(starfish_tracker_edits)
@@ -133,14 +136,14 @@ def addupdate_students(tracker0,subj:str) -> None:
         
         for index,student in starfish_nw.iterrows():
 
-            if (student["studentExtId"] in tracker["ID#"].values): #Check to see if student is already in tracker
-         
-                row = tracker.loc[tracker["ID#"] == student["studentExtId"]].index[0] + base_row #If student is in tracker, label the row in tracker.
+            if (student["studentExtId"].strip() in ids_stripped): #Check to see if student is already in tracker
+                index = ids_stripped.index(student["studentExtId"].strip())
+                row = index + base_row #If student is in tracker, label the row in tracker.
                 update_student_row(row,since_date,student,s)
                 change = True
                 book.save(starfish_tracker_edits)
 
-            elif (str(student["category"]) in ["FLAG" , "TO-DO"]) and (student["name"] not in ["Attendance Concern","Lack of Class Participation","Electronic Distraction"]) :
+            elif (str(student["category"]) in ["FLAG" , "TO_DO"]) and (student["name"] not in ["Attendance Concern","Lack of Class Participation","Electronic Distraction"]) :
                 AddStudentToTopRow(student,s)
                 base_row += 1
                 change = True
