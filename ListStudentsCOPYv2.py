@@ -15,11 +15,12 @@ from GUI.GUI_Utilities import get_file, which_subj
 # create a Student class for each row of Student spreadsheet
 class Student:
     def __init__(self, Name:str, ID, Course:str, Flag:str, emailnum:int, needsemail,camp):
+        Name = Name.strip()
         self.FN = Name.split(" ")[0]
         self.LN = Name.split(" ")[1]
         self.id = ID
         self.email = "S" + str(ID) + "@student.mcckc.edu"
-        self.course = Course.split(";")[0]
+        self.course = Course.split(";")[0].strip()
         self.flag = Flag.split(";")[0]
         self.camp = camp
         self.emailnum = emailnum
@@ -137,7 +138,7 @@ def ListStudents() -> list[Student]:
         List of student objects based on the information provided in the spreadsheet.
     """
     # initialize path to spreadsheet
-    path = get_file("Main Starfish tracking worksheet")
+    path = get_file("Main Starfish tracking worksheet",initial_folder=".\Casey's Starfish")
 
     # Ask if we are wanting to test and what subject
     Subj = which_subj("Which subject would you like to create a list for?")
